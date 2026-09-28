@@ -159,7 +159,16 @@ const $=id=>document.getElementById(id);
 const clone=x=>JSON.parse(JSON.stringify(x));
 const shuffle=(arr)=>{let a=[...arr];for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;};
 const storage=(key, fallback)=>{try{return JSON.parse(localStorage.getItem(APP_CONFIG.storagePrefix+"_"+key))??fallback;}catch{return JSON.parse(fallback);}};
-const save=(key,val)=>localStorage.setItem(APP_CONFIG.storagePrefix+"_"+key,JSON.stringify(val));
+function safeSave(key,val){
+ try{
+   localStorage.setItem(APP_CONFIG.storagePrefix+"_"+key,JSON.stringify(val));
+   return true;
+ }catch(e){
+   console.warn("Không thể lưu localStorage:",e);
+   return false;
+ }
+}
+const save=safeSave;
 
 let session=[], idx=0, answers={}, optionOrders={}, mode="exam", lastResult=null;
 
@@ -174,7 +183,7 @@ $("themeBtn").onclick=()=>setTheme(document.documentElement.dataset.theme==="dar
 $("totalCount").textContent=QUESTION_BANK.length;
 
 function mistakes(){return storage("mistakes","{}");}
-function history(){return storage("history","[]");}
+function getQuizHistory(){return storage("history","[]");}
 
 function answerLabel(q,id){
  const o=(q.options||[]).find(x=>x.id===id);
@@ -253,7 +262,7 @@ $("nextBtn").onclick=()=>{if(idx<session.length-1){idx++;renderQuestion();}};
 $("startBtn").onclick=()=>startQuiz(false);
 $("wrongBtn").onclick=()=>startQuiz(true);
 $("historyBtn").onclick=showHistory;
-$("submitBtn").onclick=submitQuiz;
+$("submitBtn").onclick=()=>{try{submitQuiz();}catch(e){console.error(e);alert("Có lỗi khi nộp bài. Vui lòng tải lại trang và thử lại. Mã lỗi: "+(e && e.message ? e.message : e));}};
 
 function submitQuiz(){
  let correct=0,wrong=0,blank=0;
@@ -263,12 +272,12 @@ function submitQuiz(){
    else if(answers[q.id]===q.answer)correct++;
    else{wrong++;m[q.id]=(m[q.id]||0)+1;}
  });
- save("mistakes",m);
+ safeSave("mistakes",m);
  const rec={
    id:Date.now(),date:new Date().toLocaleString("vi-VN"),
    total:session.length,correct,wrong,blank,percent:Math.round(correct/session.length*100)
  };
- const h=history();h.unshift(rec);save("history",h.slice(0,40));
+ const h=getQuizHistory();h.unshift(rec);safeSave("history",h.slice(0,40));
  lastResult=rec;
  $("quizScreen").classList.add("hidden");
  showResult(rec,"all");
@@ -323,7 +332,7 @@ function showHistory(){
  $("quizScreen").classList.add("hidden");
  $("resultScreen").classList.add("hidden");
  $("historyScreen").classList.remove("hidden");
- const h=history();
+ const h=getQuizHistory();
  const m=mistakes();
  const topWrong=Object.entries(m).sort((a,b)=>b[1]-a[1]).slice(0,10);
  $("historyScreen").innerHTML=`<h2 style="margin-top:0">Lịch sử làm bài</h2>
